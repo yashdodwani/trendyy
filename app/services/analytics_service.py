@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
 import pandas as pd
+from fastapi import HTTPException, status
 
 from app.analytics.aflb import compute_aflb_alerts
+from app.analytics.bis import compute_bis_alerts
+from app.analytics.lost_generation import compute_lost_generation_alerts
 from app.analytics.urrdf import compute_urrdf_alerts
-from app.core.data_loader import get_dataset
+from app.core.data_loader import get_dataset, get_merged_aadhaar_dataframe
+from app.schemas.biometric_alerts import (
+    BiometricIntegrityAlert,
+    LostGenerationAlert,
+)
 
 
 class AnalyticsService:
@@ -208,6 +215,69 @@ class AnalyticsService:
 
         return result[["state", "district", "month", "ml_inflow_score", "tier", "recommendations"]]
 
+    def get_biometric_integrity_alerts(
+        self,
+        month: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[BiometricIntegrityAlert]:
+        """
+        Service wrapper for BIS alerts (object model list).
+
+        - Uses cached merged Aadhaar DataFrame
+        - Delegates computation to analytics.bis
+        - Raises HTTP 404 if requested month has no data
+        """
+        df: pd.DataFrame = get_merged_aadhaar_dataframe()
+        alerts = compute_bis_alerts(df=df, month=month, limit=limit)
+
+        if not alerts:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No biometric integrity data available for month={month or 'latest'}",
+            )
+
+        return alerts
+
+    def get_lost_generation_alerts(
+        self,
+        month: Optional[str] = None,
+        limit: int = 15,
+    ) -> List[LostGenerationAlert]:
+        """
+        Service wrapper for Lost Generation / FAFI alerts (object model list).
+
+        - Uses cached merged Aadhaar DataFrame
+        - Delegates computation to analytics.lost_generation
+        - Raises HTTP 404 if requested month has no data
+        """
+        df: pd.DataFrame = get_merged_aadhaar_dataframe()
+        alerts = compute_lost_generation_alerts(df=df, month=month, limit=limit)
+
+        if not alerts:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No lost generation data available for month={month or 'latest'}",
+            )
+
+        return alerts
+
+    # Existing DataFrame-returning methods for new router using responses with `month` + list
+    def bis_alerts(self, month: Optional[str] = None) -> pd.DataFrame:
+        """Return BIS alerts as a DataFrame for the high-level router."""
+        df: pd.DataFrame = get_merged_aadhaar_dataframe()
+        alerts = compute_bis_alerts(df=df, month=month, limit=20)
+        if not alerts:
+            return pd.DataFrame()
+        # Convert list of models to DataFrame with month column available
+        return pd.DataFrame([a.dict() for a in alerts])
+
+    def lost_generation_alerts(self, month: Optional[str] = None) -> pd.DataFrame:
+        """Return Lost Generation alerts as a DataFrame for the high-level router."""
+        df: pd.DataFrame = get_merged_aadhaar_dataframe()
+        alerts = compute_lost_generation_alerts(df=df, month=month, limit=15)
+        if not alerts:
+            return pd.DataFrame()
+        return pd.DataFrame([a.dict() for a in alerts])
 
 
 analytics_service = AnalyticsService()
