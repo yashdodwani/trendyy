@@ -92,3 +92,39 @@ class ErrorResponse(BaseModel):
     detail: str
     debug: Optional[str] = None
 
+
+# --- ML migration response models ---
+class MigrationMLAlert(BaseModel):
+    state: str
+    district: str
+    month: str
+    ml_inflow_score: float
+    tier: str
+    recommendations: List[str]
+
+
+class MigrationMLAlertsResponse(BaseModel):
+    month: str
+    alerts: List[MigrationMLAlert]
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "month": "2025-12",
+                "alerts": [
+                    {
+                        "state": "Rajasthan",
+                        "district": "Balotra",
+                        "month": "2025-12",
+                        "ml_inflow_score": 5.43,
+                        "tier": "SURGE",
+                        "recommendations": [
+                            "Open 2 temporary enrollment/update camps",
+                            "Deploy mobile Aadhaar van",
+                            "Increase ration shop capacity",
+                            "Set up drinking water + shade",
+                        ],
+                    }
+                ],
+            }
+        }
