@@ -41,3 +41,4 @@ app.include_router(
 async def health_check() -> dict:
     """Simple health check endpoint."""
     return {"status": "ok"}
+
